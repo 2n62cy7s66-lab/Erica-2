@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 맞춤형 하루 공부 시간표</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    body { font-family: 'Pretendard', sans-serif; }
+  </style>
+</head>
+<body class="bg-blue-50/50 text-slate-800 min-h-screen flex flex-col">
+
+  <header class="bg-white border-b border-blue-100 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-md shadow-blue-200">
+          <i class="fa-solid fa-graduation-cap"></i>
+        </div>
+        <h1 class="text-xl font-bold text-slate-800">스마트 AI 공부 플래너</h1>
+      </div>
+      <button id="alarmPermissionBtn" onclick="initAudioAndNotification()" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-200 transition font-medium flex items-center gap-1.5">
+        <i class="fa-regular fa-bell"></i> 알림 권한 허용
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+
+    <section class="bg-white rounded-2xl p-6 shadow-sm border border-blue-100">
+      <h2 class="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-sliders text-blue-600"></i> 학생 정보 입력
+      </h2>
+      <form id="planForm" onsubmit="generatePlanner(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">학교 이름 <span class="text-red-500">*</span></label>
+          <input type="text" id="school" required placeholder="예: 서울고등학교" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">학년 <span class="text-red-500">*</span></label>
+          <input type="text" id="grade" required placeholder="예: 고등학교 2학년" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">현재 성적/수준</label>
+          <input type="text" id="currentGrade" placeholder="예: 국어 2등급, 수학 3등급" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">희망 학교</label>
+          <input type="text" id="targetSchool" placeholder="예: 연세대학교" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">희망 학과</label>
+          <input type="text" id="targetMajor" placeholder="예: 컴퓨터공학과" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">기타 취약과목 / 요청사항</label>
+          <input type="text" id="extraInfo" placeholder="예: 수학 위주 플랜 요청" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        </div>
+        <div class="md:col-span-3 flex justify-end mt-2">
+          <button type="submit" id="submitBtn" class="w-full md:w-auto bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> AI 공부 시간표 생성하기
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <div id="outputArea" class="grid grid-cols-1 lg:grid-cols-12 gap-6 hidden">
+      <section class="lg:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-blue-100 flex flex-col">
+        <div class="flex items-center justify-between mb-4 border-b pb-3 border-blue-50">
+          <h3 class="text-md font-bold text-blue-900 flex items-center gap-2">
+            <i class="fa-regular fa-clock text-blue-600"></i> 하루 공부 타임테이블
+          </h3>
+          <span class="text-xs px-2.5 py-1 bg-blue-100 text-blue-700 font-semibold rounded-full" id="scheduleCount">0개 일정</span>
+        </div>
+        <div id="timetableList" class="space-y-3 overflow-y-auto max-h-[600px] pr-1"></div>
+      </section>
+
+      <section class="lg:col-span-7 bg-white rounded-2xl p-6 shadow-sm border border-blue-100 flex flex-col">
+        <div class="flex items-center justify-between mb-4 border-b pb-3 border-blue-50">
+          <h3 class="text-md font-bold text-blue-900 flex items-center gap-2">
+            <i class="fa-solid fa-lightbulb text-amber-500"></i> AI 맞춤 학습 피드백 & 전략
+          </h3>
+        </div>
+        <div id="aiDescription" class="prose prose-blue text-sm text-slate-600 leading-relaxed overflow-y-auto max-h-[600px] whitespace-pre-line pr-2"></div>
+      </section>
+    </div>
+
+    <div id="loadingArea" class="hidden bg-white rounded-2xl p-12 text-center border border-blue-100 shadow-sm">
+      <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent mb-4"></div>
+      <p class="text-slate-700 font-semibold text-lg">AI가 맞춤형 하루 시간표를 짜고 있어요...</p>
+    </div>
+
+  </main>
+
+  <script>
+    let activeSchedule = [];
+    let notifiedTasks = new Set();
+    let audioCtx = null;
+
+    function initAudioAndNotification() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      if ("Notification" in window) {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            const btn = document.getElementById("alarmPermissionBtn");
+            btn.classList.remove("bg-blue-100", "text-blue-700");
+            btn.classList.add("bg-green-100", "text-green-700");
+            btn.innerHTML = `<i class="fa-solid fa-bell font-bold"></i> 알림 활성화됨`;
+          }
+        });
+      }
+    }
+
+    async function generatePlanner(e) {
+      e.preventDefault();
+      initAudioAndNotification();
+
+      const school = document.getElementById('school').value;
+      const grade = document.getElementById('grade').value;
+      const currentGrade = document.getElementById('currentGrade').value;
+      const targetSchool = document.getElementById('targetSchool').value;
+      const targetMajor = document.getElementById('targetMajor').value;
+      const extraInfo = document.getElementById('extraInfo').value;
+
+      document.getElementById('outputArea').classList.add('hidden');
+      document.getElementById('loadingArea').classList.remove('hidden');
+
+      try {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ school, grade, currentGrade, targetSchool, targetMajor, extraInfo })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          renderResults(data);
+        } else {
+          alert('오류: ' + (data.error || '시간표 생성에 실패했습니다.'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('서버 연결 중 문제가 발생했습니다.');
+      } finally {
+        document.getElementById('loadingArea').classList.add('hidden');
+      }
+    }
+
+    function renderResults(data) {
+      activeSchedule = data.schedule || [];
+      notifiedTasks.clear();
+
+      const timetableList = document.getElementById('timetableList');
+      timetableList.innerHTML = '';
+
+      const categoryStyles = {
+        study: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800', label: '공부' },
+        school: { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-800', label: '학교/수업' },
+        meal: { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-800', label: '식사' },
+        rest: { border: 'border-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-800', label: '휴식/수면' }
+      };
+
+      activeSchedule.forEach(item => {
+        const style = categoryStyles[item.category] || categoryStyles.study;
+        const card = document.createElement('div');
+        card.className = `p-3.5 rounded-xl border-l-4 ${style.border} ${style.bg} flex items-center justify-between transition hover:shadow-md`;
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-bold ${style.text}">${item.start} ~ ${item.end}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${style.badge}">${style.label}</span>
+            </div>
+            <p class="font-semibold text-slate-800 text-sm">${item.task}</p>
+          </div>
+        `;
+        timetableList.appendChild(card);
+      });
+
+      document.getElementById('scheduleCount').innerText = `${activeSchedule.length}개 일정`;
+      document.getElementById('aiDescription').innerText = data.description;
+      document.getElementById('outputArea').classList.remove('hidden');
+    }
+
+    setInterval(() => {
+      if (!activeSchedule.length) return;
+
+      const now = new Date();
+      const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      activeSchedule.forEach(item => {
+        if (item.start === currentHHMM && !notifiedTasks.has(item.start + item.task)) {
+          triggerAlarm(item);
+          notifiedTasks.add(item.start + item.task);
+        }
+      });
+    }, 10000);
+
+    function triggerAlarm(item) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("⏰ 일정 알림", {
+          body: `[${item.start}] 지금 할 일: ${item.task}`,
+          icon: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+        });
+      }
+
+      if (audioCtx) {
+        try {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.5);
+        } catch(e) {
+          console.error("Audio playback error:", e);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
