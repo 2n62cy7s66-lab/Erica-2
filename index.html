@@ -10,6 +10,83 @@
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     body { font-family: 'Pretendard', sans-serif; }
   </style>
+
+  <!-- Firebase Web SDK (v10 모듈) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      query, 
+      orderBy, 
+      onSnapshot, 
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // Firebase 설정
+    const firebaseConfig = {
+      apiKey: "AIzaSyDQIg5o1rRX4f9FObgrtlUlrM9ri5ZpDVs",
+      authDomain: "erica-fadcc.firebaseapp.com",
+      projectId: "erica-fadcc",
+      storageBucket: "erica-fadcc.firebasestorage.app",
+      messagingSenderId: "898048790808",
+      appId: "1:898048790808:web:9e1223a2a46d0ea4a6ce6d"
+    };
+
+    // Firebase 및 Firestore 초기화
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 전역 객체에 등록
+    window.db = db;
+    window.addDoc = addDoc;
+    window.collection = collection;
+    window.serverTimestamp = serverTimestamp;
+
+    // Firestore에서 의견 목록 실시간 최신순(createdAt desc) 불러오기
+    const opinionsCol = collection(db, "opinions");
+    const q = query(opinionsCol, orderBy("createdAt", "desc"));
+
+    onSnapshot(q, (snapshot) => {
+      const boardList = document.getElementById("boardList");
+      if (!boardList) return;
+
+      boardList.innerHTML = "";
+
+      if (snapshot.empty) {
+        boardList.innerHTML = `
+          <div class="text-center py-8 text-slate-400 text-sm">
+            등록된 의견이 없습니다. 첫 의견을 남겨보세요!
+          </div>
+        `;
+        return;
+      }
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const dateStr = data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString('ko-KR', {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit'
+        }) : "방금 전";
+
+        const card = document.createElement("div");
+        card.className = "p-4 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between space-y-2 hover:bg-blue-50/30 transition";
+        card.innerHTML = `
+          <p class="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">${escapeHtml(data.text)}</p>
+          <span class="text-[11px] text-slate-400 text-right">${dateStr}</span>
+        `;
+        boardList.appendChild(card);
+      });
+    }, (error) => {
+      console.error("Firestore 연결 오류:", error);
+    });
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
 </head>
 <body class="bg-blue-50/50 text-slate-800 min-h-screen flex flex-col">
 
@@ -29,6 +106,7 @@
 
   <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
 
+    <!-- 학생 정보 입력 영역 -->
     <section class="bg-white rounded-2xl p-6 shadow-sm border border-blue-100">
       <h2 class="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
         <i class="fa-solid fa-sliders text-blue-600"></i> 학생 정보 입력
@@ -66,6 +144,7 @@
       </form>
     </section>
 
+    <!-- 생성된 시간표 & 피드백 출력 영역 -->
     <div id="outputArea" class="grid grid-cols-1 lg:grid-cols-12 gap-6 hidden">
       <section class="lg:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-blue-100 flex flex-col">
         <div class="flex items-center justify-between mb-4 border-b pb-3 border-blue-50">
@@ -87,10 +166,43 @@
       </section>
     </div>
 
+    <!-- 로딩 화면 -->
     <div id="loadingArea" class="hidden bg-white rounded-2xl p-12 text-center border border-blue-100 shadow-sm">
       <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent mb-4"></div>
       <p class="text-slate-700 font-semibold text-lg">AI가 맞춤형 하루 시간표를 짜고 있어요...</p>
     </div>
+
+    <!-- 의견 게시판 영역 -->
+    <section class="bg-white rounded-2xl p-6 shadow-sm border border-blue-100 space-y-4">
+      <h2 class="text-lg font-bold text-blue-900 flex items-center gap-2">
+        <i class="fa-regular fa-comments text-blue-600"></i> 사용자 의견 및 개선 요청
+      </h2>
+
+      <!-- 의견 입력 폼 -->
+      <form onsubmit="submitOpinion(event)" class="flex flex-col sm:flex-row gap-3">
+        <input 
+          type="text" 
+          id="opinionInput" 
+          required 
+          placeholder="서비스 이용 후기나 개선할 점을 자유롭게 적어주세요!" 
+          class="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        >
+        <button 
+          type="submit" 
+          id="opinionSubmitBtn"
+          class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-blue-700 transition shadow-sm text-sm shrink-0 flex items-center justify-center gap-2"
+        >
+          <i class="fa-solid fa-paper-plane"></i> 등록
+        </button>
+      </form>
+
+      <!-- 게시물 목록 -->
+      <div id="boardList" class="space-y-3 pt-2 max-h-[400px] overflow-y-auto pr-1">
+        <div class="text-center py-8 text-slate-400 text-sm">
+          의견을 불러오는 중입니다...
+        </div>
+      </div>
+    </section>
 
   </main>
 
@@ -98,6 +210,38 @@
     let activeSchedule = [];
     let notifiedTasks = new Set();
     let audioCtx = null;
+
+    // 의견 Firestore 등록
+    async function submitOpinion(e) {
+      e.preventDefault();
+      const input = document.getElementById("opinionInput");
+      const submitBtn = document.getElementById("opinionSubmitBtn");
+      const text = input.value.trim();
+
+      if (!text) return;
+
+      if (!window.db) {
+        alert("Firebase가 초기화되지 않았습니다.");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerText = "등록 중...";
+
+      try {
+        await window.addDoc(window.collection(window.db, "opinions"), {
+          text: text,
+          createdAt: window.serverTimestamp()
+        });
+        input.value = "";
+      } catch (err) {
+        console.error("의견 등록 에러:", err);
+        alert("의견 등록 실패: " + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> 등록`;
+      }
+    }
 
     function initAudioAndNotification() {
       if (!audioCtx) {
@@ -190,6 +334,7 @@
       document.getElementById('outputArea').classList.remove('hidden');
     }
 
+    // 알람 타이머
     setInterval(() => {
       if (!activeSchedule.length) return;
 
